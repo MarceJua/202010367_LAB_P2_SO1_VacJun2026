@@ -1,0 +1,35 @@
+# =========================
+# Rust (API REST)
+# =========================
+/api-rust/target/
+**/*.rs.bk
+
+# =========================
+# Go (Microservicios)
+# =========================
+/grpc-server/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# =========================
+# Python (Locust)
+# =========================
+locust_env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# =========================
+# Entornos de desarrollo y OS
+# =========================
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+.env
