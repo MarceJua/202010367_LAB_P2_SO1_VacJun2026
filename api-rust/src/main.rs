@@ -1,7 +1,6 @@
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
 
-// Definimos la estructura exacta que enviará Locust
 #[derive(Deserialize, Serialize, Debug)]
 struct Prediction {
     home_team: String,
@@ -12,21 +11,33 @@ struct Prediction {
     timestamp: String,
 }
 
-// Ruta principal que recibirá las peticiones POST
 #[post("/")]
 async fn receive_prediction(prediction: web::Json<Prediction>) -> impl Responder {
-    // Imprimimos el JSON recibido en la consola para verificar que funciona
-    println!("[RUST] Nueva predicción recibida: {:?}", prediction);
+    println!("[RUST] JSON recibido de Locust, enviando a Go Client...");
+
+    let client = reqwest::Client::new();
     
-    // Aquí (en el siguiente paso) agregaremos la lógica para enviarlo al cliente de Go
-    
-    // Respondemos con un 200 OK y devolvemos el mismo JSON
-    HttpResponse::Ok().json(prediction.into_inner())
+    // Hacemos el POST al Microservicio 2 (Go Client) en el puerto 8081
+    let res = client.post("http://localhost:8081/")
+        .json(&prediction.into_inner())
+        .send()
+        .await;
+
+    match res {
+        Ok(response) => {
+            println!("[RUST] Enviado con éxito a Go.");
+            HttpResponse::Ok().body(response.text().await.unwrap_or_default())
+        }
+        Err(e) => {
+            println!("[RUST] Error al enviar a Go: {}", e);
+            HttpResponse::InternalServerError().body("Error comunicando con Go Client")
+        }
+    }
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    println!(" Servidor Rust iniciando en http://127.0.0.1:8080");
+    println!("Servidor Rust iniciando en http://127.0.0.1:8080");
     
     HttpServer::new(|| {
         App::new().service(receive_prediction)
