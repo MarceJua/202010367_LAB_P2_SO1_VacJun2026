@@ -3,6 +3,7 @@ module grpc-server
 go 1.25.0
 
 require (
+	github.com/rabbitmq/amqp091-go v1.12.0
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
 )
