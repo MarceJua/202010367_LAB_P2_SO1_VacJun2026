@@ -1,5 +1,6 @@
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
+use std::env;
 
 #[derive(Deserialize, Serialize, Debug)]
 struct Prediction {
@@ -15,17 +16,19 @@ struct Prediction {
 async fn receive_prediction(prediction: web::Json<Prediction>) -> impl Responder {
     println!("[RUST] JSON recibido de Locust, enviando a Go Client...");
 
+    // Leemos la variable de entorno, si no existe, usamos localhost
+    let go_client_url = env::var("GO_CLIENT_URL").unwrap_or_else(|_| "http://localhost:8081/".to_string());
+
     let client = reqwest::Client::new();
     
-    // Hacemos el POST al Microservicio 2 (Go Client) en el puerto 8081
-    let res = client.post("http://localhost:8081/")
+    let res = client.post(&go_client_url)
         .json(&prediction.into_inner())
         .send()
         .await;
 
     match res {
         Ok(response) => {
-            println!("[RUST] Enviado con éxito a Go.");
+            println!("[RUST] Enviado con éxito a Go en {}.", go_client_url);
             HttpResponse::Ok().body(response.text().await.unwrap_or_default())
         }
         Err(e) => {
@@ -37,12 +40,12 @@ async fn receive_prediction(prediction: web::Json<Prediction>) -> impl Responder
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    println!("Servidor Rust iniciando en http://127.0.0.1:8080");
+    println!("Servidor Rust iniciando en http://0.0.0.0:8080");
     
     HttpServer::new(|| {
         App::new().service(receive_prediction)
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 8080))? // Es mejor bindear a 0.0.0.0 para Docker
     .run()
     .await
 }

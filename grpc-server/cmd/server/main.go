@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 
 	pb "grpc-server/proto"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -30,7 +31,7 @@ type RabbitMessage struct {
 
 func (s *server) SendPrediction(ctx context.Context, req *pb.MatchPredictionRequest) (*pb.MatchPredictionResponse, error) {
 	log.Printf("[GRPC SERVER] Predicción recibida: %v vs %v por %s", req.HomeTeam, req.AwayTeam, req.Username)
-	
+
 	// Preparamos el mensaje para RabbitMQ
 	msg := RabbitMessage{
 		HomeTeam:  req.HomeTeam.String(),
@@ -66,12 +67,16 @@ func (s *server) SendPrediction(ctx context.Context, req *pb.MatchPredictionRequ
 	log.Println("[RABBITMQ WRITER] Mensaje encolado exitosamente")
 	return &pb.MatchPredictionResponse{Status: "Recibido y encolado en RabbitMQ exitosamente"}, nil
 }
-
 func main() {
-	// 1. Conexión a RabbitMQ Local
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	// Variable de entorno para RabbitMQ
+	rabbitUrl := os.Getenv("RABBITMQ_URL")
+	if rabbitUrl == "" {
+		rabbitUrl = "amqp://guest:guest@localhost:5672/"
+	}
+
+	conn, err := amqp.Dial(rabbitUrl)
 	if err != nil {
-		log.Fatalf("Fallo al conectar a RabbitMQ: %v", err)
+		log.Fatalf("Fallo al conectar a RabbitMQ en %s: %v", rabbitUrl, err)
 	}
 	defer conn.Close()
 
@@ -81,20 +86,11 @@ func main() {
 	}
 	defer ch.Close()
 
-	// Declaramos la cola para asegurarnos de que exista
-	_, err = ch.QueueDeclare(
-		"quiniela_queue", // nombre
-		true,             // durable (sobrevive a reinicios)
-		false,            // delete when unused
-		false,            // exclusive
-		false,            // no-wait
-		nil,              // arguments
-	)
+	_, err = ch.QueueDeclare("quiniela_queue", true, false, false, false, nil)
 	if err != nil {
 		log.Fatalf("Fallo al declarar la cola: %v", err)
 	}
 
-	// 2. Levantar servidor gRPC
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("Fallo al escuchar: %v", err)
@@ -103,7 +99,7 @@ func main() {
 	s := grpc.NewServer()
 	pb.RegisterMatchPredictionServiceServer(s, &server{rabbitChannel: ch})
 
-	fmt.Println("Servidor gRPC + RabbitMQ Writer escuchando en puerto :50051")
+	fmt.Println("Servidor gRPC + RabbitMQ escuchando en :50051")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Fallo al servir: %v", err)
 	}

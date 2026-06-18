@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"os"
 
 	pb "grpc-server/proto"
 	"google.golang.org/grpc"
@@ -46,18 +47,22 @@ func predictionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[GO CLIENT] JSON recibido desde Rust, enviando por gRPC...")
+	// 1. Variable de entorno para el Servidor gRPC
+	grpcAddr := os.Getenv("GRPC_SERVER_ADDR")
+	if grpcAddr == "" {
+		grpcAddr = "localhost:50051"
+	}
 
-	// 1. Conexión gRPC al Servidor
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	log.Printf("[GO CLIENT] Enviando por gRPC a %s...", grpcAddr)
+
+	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("No se pudo conectar: %v", err)
+		log.Fatalf("No se pudo conectar a gRPC: %v", err)
 	}
 	defer conn.Close()
 
 	client := pb.NewMatchPredictionServiceClient(conn)
 
-	// 2. Mapear los datos al formato estricto de Protobuf
 	req := &pb.MatchPredictionRequest{
 		HomeTeam:  parseTeam(p.HomeTeam),
 		AwayTeam:  parseTeam(p.AwayTeam),
@@ -67,21 +72,17 @@ func predictionHandler(w http.ResponseWriter, r *http.Request) {
 		Timestamp: p.Timestamp,
 	}
 
-	// 3. Ejecutar la llamada con un límite de tiempo de 2 segundos
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	res, err := client.SendPrediction(ctx, req)
 	grpcStatus := "Error en comunicación gRPC"
-
 	if err != nil {
 		log.Printf("[ERROR] Fallo al llamar a gRPC: %v", err)
 	} else {
 		grpcStatus = res.GetStatus()
-		log.Printf("[ÉXITO] Respuesta de gRPC Server: %s", grpcStatus)
 	}
 
-	// 4. Responder a Rust con el estado final
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
@@ -92,9 +93,8 @@ func predictionHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/", predictionHandler)
-
-	fmt.Println(" Cliente Go (Microservicio 2) escuchando en http://localhost:8081")
+	fmt.Println("Cliente Go escuchando en puerto :8081")
 	if err := http.ListenAndServe(":8081", nil); err != nil {
-		log.Fatalf("Error al iniciar el servidor HTTP: %v", err)
+		log.Fatalf("Error al iniciar el servidor: %v", err)
 	}
 }
