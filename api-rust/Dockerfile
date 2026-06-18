@@ -1,5 +1,5 @@
 # Etapa de construcción
-FROM rust:1.79 AS builder
+FROM rust:latest AS builder
 WORKDIR /usr/src/app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src

@@ -27,7 +27,7 @@ class QuinielaUser(HttpUser):
         username = f"user_{random.randint(1, 1000)}"
 
         # Timestamp actual en formato ISO 8601
-        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         payload = {
             "home_team": home_team,

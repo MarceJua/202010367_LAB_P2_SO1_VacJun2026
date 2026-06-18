@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  valkey:
+    image: valkey/valkey:latest
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      # Ahora verificamos específicamente que el puerto AMQP esté aceptando conexiones
+      test: rabbitmq-diagnostics -q check_port_connectivity
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  go-consumer:
+    build:
+      context: ./grpc-server
+      dockerfile: Dockerfile.consumer
+    restart: on-failure # Imitamos a Kubernetes
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - VALKEY_ADDR=valkey:6379
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  go-server:
+    build:
+      context: ./grpc-server
+      dockerfile: Dockerfile.server
+    restart: on-failure # Imitamos a Kubernetes
+    ports:
+      - "50051:50051"
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  go-client:
+    build:
+      context: ./grpc-server
+      dockerfile: Dockerfile.client
+    restart: on-failure # Imitamos a Kubernetes
+    ports:
+      - "8081:8081"
+    environment:
+      - GRPC_SERVER_ADDR=go-server:50051
+    depends_on:
+      - go-server
+
+  api-rust:
+    build:
+      context: ./api-rust
+      dockerfile: Dockerfile
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    environment:
+      - GO_CLIENT_URL=http://go-client:8081/
+    depends_on:
+      - go-client
