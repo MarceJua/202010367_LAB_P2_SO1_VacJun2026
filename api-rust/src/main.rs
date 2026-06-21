@@ -1,4 +1,4 @@
-use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
 use std::env;
 
@@ -12,11 +12,15 @@ struct Prediction {
     timestamp: String,
 }
 
-#[post("/")]
+#[get("/")]
+async fn health_check() -> impl Responder {
+    HttpResponse::Ok().body("API Rust Viva y Saludable")
+}
+
+// Quitamos el #[post("/")] de aquí arriba
 async fn receive_prediction(prediction: web::Json<Prediction>) -> impl Responder {
     println!("[RUST] JSON recibido de Locust, enviando a Go Client...");
 
-    // Leemos la variable de entorno, si no existe, usamos localhost
     let go_client_url = env::var("GO_CLIENT_URL").unwrap_or_else(|_| "http://localhost:8081/".to_string());
 
     let client = reqwest::Client::new();
@@ -43,9 +47,14 @@ async fn main() -> std::io::Result<()> {
     println!("Servidor Rust iniciando en http://0.0.0.0:8080");
     
     HttpServer::new(|| {
-        App::new().service(receive_prediction)
+        App::new()
+            .service(health_check)
+            // Registramos las rutas manualmente para que acepte TODAS las variaciones
+            .route("/", web::post().to(receive_prediction))
+            .route("/grpc-202010367", web::post().to(receive_prediction))
+            .route("/grpc-202010367/", web::post().to(receive_prediction))
     })
-    .bind(("0.0.0.0", 8080))? // Es mejor bindear a 0.0.0.0 para Docker
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await
 }

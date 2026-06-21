@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: zot-registry-patch
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: zot-registry-patch
+  template:
+    metadata:
+      labels:
+        app: zot-registry-patch
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: patch-containerd
+        image: alpine:latest
+        securityContext:
+          privileged: true
+        command: ["nsenter", "--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid", "--", "sh", "-c"]
+        args:
+        - |
+          echo "Aplicando parche intensivo a containerd..."
+          
+          # 1. Crear el directorio certs.d para la IP
+          mkdir -p /etc/containerd/certs.d/34.136.113.161:8080
+          
+          # 2. Crear el archivo hosts.toml indicando que es HTTP
+          cat <<'EOF' > /etc/containerd/certs.d/34.136.113.161:8080/hosts.toml
+          server = "http://34.136.113.161:8080"
+          
+          [host."http://34.136.113.161:8080"]
+            capabilities = ["pull", "resolve"]
+            skip_verify = true
+          EOF
+          
+          # 3. Forzar a containerd a usar HTTP en su configuración principal (Legacy/Seguro)
+          if ! grep -q "34.136.113.161:8080" /etc/containerd/config.toml; then
+            echo '
+          [plugins."io.containerd.grpc.v1.cri".registry.mirrors."34.136.113.161:8080"]
+            endpoint = ["http://34.136.113.161:8080"]
+          [plugins."io.containerd.grpc.v1.cri".registry.configs."34.136.113.161:8080".tls]
+            insecure_skip_verify = true
+          ' >> /etc/containerd/config.toml
+          fi
+          
+          # Reiniciar el servicio para que tome los cambios
+          systemctl restart containerd
+          
+          echo "Listo. Manteniendo pod vivo."
+          sleep infinity

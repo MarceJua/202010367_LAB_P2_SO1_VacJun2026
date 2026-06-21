@@ -1,0 +1,32 @@
+kind: Gateway
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: quiniela-gateway
+spec:
+  gatewayClassName: gke-l7-gxlb
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+---
+kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: rust-api-route
+spec:
+  parentRefs:
+  - name: quiniela-gateway
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /grpc-202010367
+    filters:
+    - type: URLRewrite
+      urlRewrite:
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /
+    backendRefs:
+    - name: api-rust
+      port: 8080
