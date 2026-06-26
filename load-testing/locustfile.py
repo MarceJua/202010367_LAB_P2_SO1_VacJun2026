@@ -24,7 +24,7 @@ class QuinielaUser(HttpUser):
         away_goals = random.randint(0, 5)
 
         # Simular nombres de usuario
-        username = f"user_{random.randint(1, 1000)}"
+        username = f"user_{random.randint(1, 10)}"
 
         # Timestamp actual en formato ISO 8601
         timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
