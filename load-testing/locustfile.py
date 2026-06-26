@@ -41,4 +41,4 @@ class QuinielaUser(HttpUser):
         headers = {'Content-Type': 'application/json'}
 
         # Enviar la petición POST al endpoint raíz
-        self.client.post("/", data=json.dumps(payload), headers=headers)
+        self.client.post("/grpc-202010367", data=json.dumps(payload), headers=headers)

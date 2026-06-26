@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: go-consumer
-        image: 34.136.113.161:8080/go-consumer:latest
+        image: us-central1-docker.pkg.dev/deep-clock-500019-v8/quiniela-repo/go-consumer:latest
         imagePullPolicy: Always
         env:
         - name: RABBITMQ_URL

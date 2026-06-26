@@ -1,0 +1,48 @@
+kubectl delete -f insecure-registry.yaml
+
+cat << 'EOF' > insecure-registry.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: containerd-insecure-registry
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: containerd-insecure-registry
+  template:
+    metadata:
+      labels:
+        name: containerd-insecure-registry
+    spec:
+      hostPID: true
+      containers:
+      - name: node-patcher
+        image: alpine
+        securityContext:
+          privileged: true
+        command:
+        - nsenter
+        - -t
+        - "1"
+        - -m
+        - -u
+        - -i
+        - -n
+        - -p
+        - --
+        - sh
+        - -c
+        - |
+          mkdir -p /etc/containerd/certs.d/34.136.113.161:8080
+          cat <<TOML > /etc/containerd/certs.d/34.136.113.161:8080/hosts.toml
+          server = "http://34.136.113.161:8080"
+          [host."http://34.136.113.161:8080"]
+            capabilities = ["pull", "resolve"]
+            skip_verify = true
+          TOML
+          systemctl restart containerd
+          sleep infinity
+EOF
+
+kubectl apply -f insecure-registry.yaml

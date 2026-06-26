@@ -1,0 +1,66 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: valkey-vm
+  labels:
+    app: valkey-vm
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: valkey-vm
+        app: valkey-vm
+    spec:
+      domain:
+        cpu:
+          cores: 1
+        resources:
+          requests:
+            memory: 1024M
+        devices:
+          disks:
+          - name: containerdisk
+            disk:
+              bus: virtio
+          - name: cloudinitdisk
+            disk:
+              bus: virtio
+          interfaces:
+          - name: default
+            masquerade: {}
+            ports:
+            - port: 6379
+      networks:
+      - name: default
+        pod: {}
+      volumes:
+      - name: containerdisk
+        containerDisk:
+          image: quay.io/containerdisks/debian:12
+      - name: cloudinitdisk
+        cloudInitNoCloud:
+          userData: |
+            #cloud-config
+            chpasswd:
+              list: |
+                debian:root
+                root:root
+              expire: False
+            ssh_pwauth: True
+            runcmd:
+              - apt-get update
+              - DEBIAN_FRONTEND=noninteractive apt-get install -y containerd
+              - ctr images pull docker.io/valkey/valkey:latest
+              - ctr run -d --net-host docker.io/valkey/valkey:latest valkey-db valkey-server --bind 0.0.0.0 --protected-mode no
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: valkey
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: valkey-vm
